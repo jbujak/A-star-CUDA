@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include "astar_gpu.h"
+
 enum version_values {
 	SLIDING, PATHFINDING
 };
@@ -12,8 +14,28 @@ struct config {
 
 config parse_args(int argc, const char *argv[]);
 
+char** expand1(const char *str) {
+	char **result = (char**)malloc(10 * sizeof(char*));
+	result[0] = (char*)"a";
+	result[1] = (char*)"b";
+	result[2] = NULL;
+	return result;
+}
+
+char** expand2(const char *str) {
+	char **result = (char**)malloc(10 * sizeof(char*));
+	result[0] = (char*)"x";
+	result[1] = (char*)"y";
+	result[2] = (char*)"z";
+	result[3] = NULL;
+	return result;
+}
+
 int main(int argc, const char *argv[]) {
 	config config;
+	astar_cpu("a", "b", 1, expand1);
+
+	return 0;
 	try {
 		config = parse_args(argc, argv);
 	} catch (std::string error) {
