@@ -2,3 +2,4 @@ astar_gpu
 *.o
 .ycm_extra_conf.py
 tags
+*.un~

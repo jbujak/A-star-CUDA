@@ -1,21 +1,16 @@
-FLAGS=-std=c++14 -g -G
+FLAGS = -std=c++14 -g -G
+OBJS = astar_gpu.o heap.o list.o sliding_puzzle.o cuda_utils.o
 ifeq ($(wildcard /opt/cuda/bin/nvcc),)
 	NVCC=nvcc
 else
 	NVCC=/opt/cuda/bin/nvcc
 endif
 
-astar_gpu: main.cu astar_gpu.o heap.o list.o
-	$(NVCC) $(FLAGS) main.cu astar_gpu.o heap.o list.o -o astar_gpu
+astar_gpu: main.cu $(OBJS)
+	$(NVCC) $(FLAGS) main.cu $(OBJS) -o astar_gpu
 
-astar_gpu.o: astar_gpu.cu astar_gpu.h
-	$(NVCC) $(FLAGS) -c --device-c astar_gpu.cu -o astar_gpu.o
-
-heap.o: heap.cu heap.h
-	$(NVCC) $(FLAGS) -c --device-c heap.cu -o heap.o
-
-list.o: list.cu list.h
-	$(NVCC) $(FLAGS) -c --device-c list.cu -o list.o
+%.o: %.cu %.h
+	$(NVCC) $(FLAGS) -c --device-c $*.cu -o $*.o
 
 .PHONY: clean
 clean:

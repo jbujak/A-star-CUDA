@@ -1,9 +1,22 @@
 #include "heap.h"
 #include "astar_gpu.h"
+#include "cuda_utils.h"
 #include <stdlib.h>
 #include <stdio.h>
 
 __device__ static void swap(state **s1, state **s2);
+
+heap **heaps_create(int k) {
+	heap **Q_cpu = (heap**)malloc(k * sizeof(heap*));
+	heap **Q_dev = NULL;
+	for (int i = 0; i < k; i++) {
+		Q_cpu[i] = heap_create(10000000);
+	}
+	HANDLE_RESULT(cudaMalloc(&Q_dev, k * sizeof(heap*)));
+	HANDLE_RESULT(cudaMemcpy(Q_dev, Q_cpu, k * sizeof(heap*), cudaMemcpyDefault));
+	free(Q_cpu);
+	return Q_dev;
+}
 
 heap *heap_create(int capacity) {
 	heap heap_cpu;
@@ -15,6 +28,16 @@ heap *heap_create(int capacity) {
 	HANDLE_RESULT(cudaMalloc(&heap_dev, sizeof(heap)));
 	HANDLE_RESULT(cudaMemcpy(heap_dev, &heap_cpu, sizeof(heap), cudaMemcpyDefault));
 	return heap_dev;
+}
+
+void heaps_destroy(heap **Q_dev, int k) {
+	heap **Q_cpu = (heap**)malloc(k * sizeof(heap*));
+	HANDLE_RESULT(cudaMemcpy(Q_cpu, Q_dev, k * sizeof(heap*), cudaMemcpyDefault));
+	for (int i = 0; i < k; i++) {
+		heap_destroy(Q_cpu[i]);
+	}
+	free(Q_cpu);
+	HANDLE_RESULT(cudaFree(Q_dev));
 }
 
 void heap_destroy(heap *heap_dev) {
@@ -57,6 +80,24 @@ __device__ state *heap_extract(heap *heap) {
 		current = smallest;
 	}
 	return res;
+}
+
+__device__ bool heaps_empty(heap **heaps, int k) {
+	for (int i = 0; i < k; i++) {
+		if (heaps[i]->size != 0) return false;
+	}
+	return true;
+}
+
+__device__ int heaps_min(heap **heaps, int k) {
+	int best_f = INT_MAX;
+	for (int i = 0; i < k; i++) {
+		state *current_best = heaps[i]->states[0];
+		if (current_best != NULL && current_best->f < best_f) {
+			best_f = current_best->f;
+		}
+	}
+	return best_f;
 }
 
 
