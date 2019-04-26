@@ -10,10 +10,10 @@ struct heap {
 
 heap *heap_create(int capacity);
 
-void heap_insert(heap *heap, state *state);
+void heap_destroy(heap *heap_dev);
 
-state *heap_extract(heap *heap);
+__device__ void heap_insert(heap *heap, state *state);
 
-void heap_destroy(heap *heap);
+__device__ state *heap_extract(heap *heap);
 
 #endif //HEAP_H

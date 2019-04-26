@@ -11,18 +11,14 @@ struct list {
 
 list *list_create(int capacity);
 
-void list_clear(list *list);
-
-void list_insert(list *list, state *state);
-
-void list_remove(list *list, int index);
-
-state *list_get(list *list, int index);
-
-void list_copy(list *dst, list *src);
-
-int list_find(list *list, state *state);
-
 void list_destroy(list *list);
+
+__device__ void list_clear(list *list);
+
+__device__ void list_insert(list *list, state *state);
+
+__device__ void list_remove(list *list, int index);
+
+__device__ state *list_get(list *list, int index);
 
 #endif

@@ -3,17 +3,28 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static void swap(state **s1, state **s2);
+__device__ static void swap(state **s1, state **s2);
 
 heap *heap_create(int capacity) {
-	heap *heap = (struct heap*)malloc(sizeof(struct heap));
-	heap->size = 0;
-	heap->states = (state**)calloc(capacity + 1, sizeof(state*));
-	return heap;
+	heap heap_cpu;
+	heap *heap_dev;
+	heap_cpu.size = 0;
+	HANDLE_RESULT(cudaMalloc(&(heap_cpu.states), (capacity + 1) * sizeof(state*)));
+	HANDLE_RESULT(cudaMemset(heap_cpu.states, 0, (capacity + 1) * sizeof(state*)));
+
+	HANDLE_RESULT(cudaMalloc(&heap_dev, sizeof(heap)));
+	HANDLE_RESULT(cudaMemcpy(heap_dev, &heap_cpu, sizeof(heap), cudaMemcpyDefault));
+	return heap_dev;
 }
 
-int a = 0;
-void heap_insert(heap *heap, state *state) {
+void heap_destroy(heap *heap_dev) {
+	heap heap_cpu;
+	HANDLE_RESULT(cudaMemcpy(&heap_cpu, heap_dev, sizeof(heap), cudaMemcpyDefault));
+	HANDLE_RESULT(cudaFree(heap_cpu.states));
+	HANDLE_RESULT(cudaFree(heap_dev));
+}
+
+__device__ void heap_insert(heap *heap, state *state) {
 	heap->size++;
 	heap->states[heap->size] = state;
 	int current = heap->size;
@@ -23,7 +34,7 @@ void heap_insert(heap *heap, state *state) {
 	}
 }
 
-state *heap_extract(heap *heap) {
+__device__ state *heap_extract(heap *heap) {
 	state *res = heap->states[1];
 	heap->states[1] = heap->states[heap->size];
 	heap->states[heap->size] = NULL;
@@ -48,13 +59,8 @@ state *heap_extract(heap *heap) {
 	return res;
 }
 
-void heap_destroy(heap *heap) {
-	free(heap->states);
-	free(heap);
-}
 
-
-static void swap(state **s1,  state **s2) {
+__device__ static void swap(state **s1,  state **s2) {
 	state *tmp = *s1;
 	*s1 = *s2;
 	*s2 = tmp;
