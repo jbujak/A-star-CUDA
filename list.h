@@ -9,7 +9,11 @@ struct list {
 	state **arr;
 };
 
+list **lists_create(int lists, int capacity);
+
 list *list_create(int capacity);
+
+void lists_destroy(list **lists_gpu, int lists);
 
 void list_destroy(list *list);
 

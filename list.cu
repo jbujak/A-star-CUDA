@@ -3,6 +3,18 @@
 #include <assert.h>
 #include <stdio.h>
 
+list **lists_create(int lists, int capacity) {
+	list **lists_cpu = (list**)malloc(lists * sizeof(list*));
+	for (int i = 0; i < capacity; i++) {
+		lists_cpu[i] = list_create(capacity);
+	}
+	list **lists_gpu;
+	HANDLE_RESULT(cudaMalloc(&lists_gpu, lists * sizeof(list*)));
+	HANDLE_RESULT(cudaMemcpy(lists_gpu, lists_cpu, lists, cudaMemcpyDefault));
+	free(lists_cpu);
+	return lists_gpu;
+}
+
 list *list_create(int capacity) {
 	list list_cpu;
 	list *list_gpu;
@@ -13,6 +25,16 @@ list *list_create(int capacity) {
 	HANDLE_RESULT(cudaMemcpy(list_gpu, &list_cpu, sizeof(struct list),
 				cudaMemcpyDefault));
 	return list_gpu;
+}
+
+void lists_destroy(list **lists_gpu, int lists) {
+	list **lists_cpu = (list**)malloc(lists * sizeof(list*));
+	HANDLE_RESULT(cudaMemcpy(lists_cpu, lists_gpu, lists * sizeof(list*), cudaMemcpyDefault));
+	for (int i = 0; i < lists; i++) {
+		list_destroy(lists_cpu[i]);
+	}
+	HANDLE_RESULT(cudaFree(lists_gpu));
+	free(lists_cpu);
 }
 
 void list_destroy(list *list_gpu) {

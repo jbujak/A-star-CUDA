@@ -11,9 +11,9 @@
 #define HASH_FUNS 128
 
 __global__ void astar_kernel(const char *s, const char *t, int k, int state_len,
-		heap **Q, list *S, state **H, state *states_pool, char *nodes_pool,
+		heap **Q, list **Ss, state **H, state *states_pool, char *nodes_pool,
 		char ***expand_buf, expand_fun expand, heur_fun h);
-__device__ void hash_with_replacement_deduplicate(state **H, list *T);
+__device__ void hash_with_replacement_deduplicate(state **H, list *T, int id);
 __device__ int f(const state *x, const char *t, heur_fun h);
 
 
@@ -32,10 +32,11 @@ __device__ void print_expanded(char **expanded) {
 }
 
 #define THREADS 1024
+#define BLOCKS 2
 
 int astar_gpu(const char *s_in, const char *t_in, int k) {
 	char *s_gpu, *t_gpu;
-	k = THREADS;
+	k = THREADS * BLOCKS;
 	expand_fun expand_fun_cpu;
 	heur_fun h_cpu;
 	int expand_elements;
@@ -45,19 +46,19 @@ int astar_gpu(const char *s_in, const char *t_in, int k) {
 			&expand_elements, &expand_element_size);
 
 	state **H;
-	char ***expand_buf = expand_bufs_create(THREADS, expand_elements, expand_element_size);
+	char ***expand_buf = expand_bufs_create(THREADS * BLOCKS, expand_elements, expand_element_size);
 	HANDLE_RESULT(cudaMalloc(&H, HASH_SIZE * sizeof(state*)));
 	heap **Q = heaps_create(k);
-	list *S = list_create(100000);
+	list **Ss = lists_create(BLOCKS, 100000);
 	state *states_pool;
 	char *nodes_pool;
 	states_pool_create(&states_pool, &nodes_pool, expand_element_size);
 
-	astar_kernel<<<1, THREADS>>>(s_gpu, t_gpu, k, expand_element_size, Q, S, H,
+	astar_kernel<<<BLOCKS, THREADS>>>(s_gpu, t_gpu, k, expand_element_size, Q, Ss, H,
 			states_pool, nodes_pool, expand_buf, expand_fun_cpu, h_cpu);
 
 	states_pool_destroy(states_pool, nodes_pool);
-	list_destroy(S);
+	lists_destroy(Ss, BLOCKS);
 	heaps_destroy(Q, k);
 	HANDLE_RESULT(cudaFree(H));
 	HANDLE_RESULT(cudaDeviceSynchronize());
@@ -66,25 +67,29 @@ int astar_gpu(const char *s_in, const char *t_in, int k) {
 
 __device__ int processed = 0;
 __global__ void astar_kernel(const char *s, const char *t, int k, int state_len,
-		heap **Q, list *S, state **H, state *states_pool, char *nodes_pool,
+		heap **Q, list **Ss, state **H, state *states_pool, char *nodes_pool,
 		char ***expand_buf, expand_fun expand, heur_fun h) {
 	state *m = NULL;
+	int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-	if (threadIdx.x == 0) {
+	list *S = Ss[blockIdx.x];
+
+	if (id == 0) {
 		printf("Start kernel\n");
 		heap_insert(Q[0], state_create(s, 0, 0, NULL, states_pool, nodes_pool, state_len));
 	}
 
 	int steps = 0;
 	__syncthreads();
-	char **my_expand_buf = expand_buf[threadIdx.x];
+	char **my_expand_buf = expand_buf[id];
 	while (!heaps_empty(Q, k)) {
 		steps++;
-		if (threadIdx.x == 0) {
+		if (id == 0) {
+		//if (threadIdx.x == 0) { TODO restore
 			list_clear(S);
 		}
 		__syncthreads();
-		for (int i = threadIdx.x; i < k; i += blockDim.x) {
+		for (int i = id; i < k; i += blockDim.x * gridDim.x) {
 			if (Q[i]->size == 0) continue;
 			state *q = heap_extract(Q[i]);
 			if (threadIdx.x == 0 && steps % 10 == 0) printf("sted %d, processed %d, total distance %d\n", steps, processed, q->f);
@@ -114,13 +119,13 @@ __global__ void astar_kernel(const char *s, const char *t, int k, int state_len,
 			break;
 		}
 		__syncthreads();
-		hash_with_replacement_deduplicate(H, S);
+		hash_with_replacement_deduplicate(H, S, id);
 		__syncthreads();
-		for (int i = threadIdx.x; i < S->length; i += blockDim.x) {
+		for (int i = id; i < S->length; i += blockDim.x * gridDim.x) {
 			state *t1 = list_get(S, i);
 			if (t1 != NULL) {
 				t1->f = f(t1, t, h);
-				heap_insert(Q[threadIdx.x], t1);
+				heap_insert(Q[id], t1);
 				atomicAdd(&processed, 1);
 			}
 		}
@@ -128,8 +133,8 @@ __global__ void astar_kernel(const char *s, const char *t, int k, int state_len,
 	}
 }
 
-__device__ void hash_with_replacement_deduplicate(state **H, list *T) {
-	for (int i = threadIdx.x; i < T->length; i += blockDim.x) {
+__device__ void hash_with_replacement_deduplicate(state **H, list *T, int id) {
+	for (int i = id; i < T->length; i += blockDim.x * gridDim.x) {
 		int z = 0;
 		state *t = list_get(T, i);
 		for (int j = 0; j < HASH_FUNS; j++) {
