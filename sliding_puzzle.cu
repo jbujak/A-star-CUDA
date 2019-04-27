@@ -27,7 +27,6 @@ __device__ void expand_sliding(const char *str, char **result) {
 			if (new_row == empty_row && new_col == empty_col) continue;
 
 			int new_pos = 3 * (SLIDING_N * new_row + new_col);
-			result[cur] = (char*)malloc(3 * len + 1);
 			memcpy(result[cur], str, SLIDING_EXPANDED_STATE_LEN + 1);
 			result[cur][3 * empty_pos] = str[new_pos];
 			result[cur][3 * empty_pos + 1] = str[new_pos + 1];
@@ -36,7 +35,7 @@ __device__ void expand_sliding(const char *str, char **result) {
 			cur++;
 		}
 	}
-	result[cur] = NULL;
+	result[cur][0] ='\0';
 }
 
 __device__ int sliding_map[SLIDING_STATE_LEN + 1];
@@ -105,6 +104,6 @@ void sliding_puzzle_preprocessing(const char *s_in, const char *t_in, char **s_o
 	*t_out = t_gpu;
 	*expand_out = expand_fun_cpu;
 	*h_out = h_cpu;
-	*expand_elements_out = 4;
-	*expand_element_size_out = SLIDING_EXPANDED_STATE_LEN;
+	*expand_elements_out = 5;
+	*expand_element_size_out = SLIDING_EXPANDED_STATE_LEN + 1;
 }

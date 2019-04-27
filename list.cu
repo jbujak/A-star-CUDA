@@ -1,4 +1,5 @@
 #include "list.h"
+#include "cuda_utils.h"
 #include <assert.h>
 #include <stdio.h>
 
@@ -26,8 +27,9 @@ __device__ void list_clear(list *list) {
 }
 
 __device__ void list_insert(list *list, state *state) {
-	assert(list->length < list->capacity);
-	list->arr[list->length++] = state;
+	int index = atomicAdd(&(list->length), 1);
+	assert(index < list->capacity);
+	list->arr[index] = state;
 }
 
 __device__ void list_remove(list *list, int index) {

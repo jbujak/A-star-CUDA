@@ -10,7 +10,7 @@ heap **heaps_create(int k) {
 	heap **Q_cpu = (heap**)malloc(k * sizeof(heap*));
 	heap **Q_dev = NULL;
 	for (int i = 0; i < k; i++) {
-		Q_cpu[i] = heap_create(10000000);
+		Q_cpu[i] = heap_create(16 * 1024);
 	}
 	HANDLE_RESULT(cudaMalloc(&Q_dev, k * sizeof(heap*)));
 	HANDLE_RESULT(cudaMemcpy(Q_dev, Q_cpu, k * sizeof(heap*), cudaMemcpyDefault));
