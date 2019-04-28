@@ -10,6 +10,8 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <fstream>
+#include <chrono>
 
 #define STATES (32 * 1024ll * 1024)
 #define HASH_SIZE  (1024 * 1024)
@@ -43,7 +45,7 @@ __device__ int found = 0;
 __device__ int out_of_memory = 0;
 __device__ char result_path[RESULT_LEN];
 
-void astar_gpu(const char *s_in, const char *t_in, version_value version) {
+void astar_gpu(const char *s_in, const char *t_in, version_value version, std::fstream &output) {
 	char *s_gpu, *t_gpu;
 	int k = THREADS_PER_BLOCK * BLOCKS;
 	expand_fun expand_fun_cpu;
@@ -52,6 +54,7 @@ void astar_gpu(const char *s_in, const char *t_in, version_value version) {
 	int expand_elements;
 	int expand_element_size;
 
+	auto start = std::chrono::high_resolution_clock::now();
 	if (version == SLIDING) {
 		sliding_puzzle_preprocessing(s_in, t_in, &s_gpu, &t_gpu, &expand_fun_cpu, &h_cpu, &states_delta_cpu,
 				&expand_elements, &expand_element_size);
@@ -94,6 +97,10 @@ void astar_gpu(const char *s_in, const char *t_in, version_value version) {
 		step++;
 	} while (total_Q_size_cpu > 0);
 
+	auto end = std::chrono::high_resolution_clock::now();
+
+	auto duration = end - start;
+	output << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count() << "\n";
 
 	if (found_cpu) {
 		char result_path_cpu[RESULT_LEN];
@@ -109,10 +116,10 @@ void astar_gpu(const char *s_in, const char *t_in, version_value version) {
 		}
 		std::reverse(v.begin(), v.end());
 		if (version == SLIDING) {
-			printf("%s", sliding_puzzle_postprocessing(v).c_str());
+			output << sliding_puzzle_postprocessing(v);
 		} else if (version == PATHFINDING) {
 			for (std::string path_el: v) {
-				printf("%s\n", path_el.c_str());
+				output << path_el << "\n";
 			}
 		}
 	}

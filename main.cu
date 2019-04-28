@@ -58,15 +58,16 @@ int main(int argc, const char *argv[]) {
 		return 1;
 	}
 	std::ifstream file(config.input_file);
+	std::fstream file_out(config.output_file, std::fstream::out | std::fstream::trunc);
 	if (config.version == SLIDING) {
 		std::string s, t;
 		std::getline(file, s);
 		std::getline(file, t);
-		astar_gpu(s.c_str(), t.c_str(), SLIDING);
+		astar_gpu(s.c_str(), t.c_str(), SLIDING, file_out);
 	} else if (config.version == PATHFINDING) {
 		std::string s, t;
 		pathfinding_read_input(file, s, t);
-		astar_gpu(s.c_str(), t.c_str(), PATHFINDING);
+		astar_gpu(s.c_str(), t.c_str(), PATHFINDING, file_out);
 	}
 	return 0;
 }
