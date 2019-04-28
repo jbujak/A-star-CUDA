@@ -5,12 +5,12 @@
 
 list **lists_create(int lists, int capacity) {
 	list **lists_cpu = (list**)malloc(lists * sizeof(list*));
-	for (int i = 0; i < capacity; i++) {
+	list **lists_gpu = NULL;
+	for (int i = 0; i < lists; i++) {
 		lists_cpu[i] = list_create(capacity);
 	}
-	list **lists_gpu;
 	HANDLE_RESULT(cudaMalloc(&lists_gpu, lists * sizeof(list*)));
-	HANDLE_RESULT(cudaMemcpy(lists_gpu, lists_cpu, lists, cudaMemcpyDefault));
+	HANDLE_RESULT(cudaMemcpy(lists_gpu, lists_cpu, lists * sizeof(list*), cudaMemcpyDefault));
 	free(lists_cpu);
 	return lists_gpu;
 }

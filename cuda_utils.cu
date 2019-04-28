@@ -2,6 +2,8 @@
 
 __device__ bool cuda_str_eq(const char *s1, const char *s2) {
 	while(*s1) {
+		if(!*s1) break;
+		if(!*s2) break;
 		if (*s1 != *s2) {
 			return false;
 		}
