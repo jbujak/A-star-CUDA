@@ -15,14 +15,6 @@
 #define HASH_FUNS 128
 
 __global__ void init_heap(const char *s, heap **Q, state *states_pool, char *nodes_pool, int state_len);
-__global__ void astar_kernel(const char *s, const char *t, int k, int state_len,
-		heap **Q, list **Ss, state **H, state *states_pool, char *nodes_pool,
-		char ***expand_buf, expand_fun expand, heur_fun h);
-__device__ void hash_with_replacement_deduplicate(state **H, list *T, int id);
-__device__ int f(const state *x, const char *t, heur_fun h);
-__device__ int calculate_id();
-
-
 __global__ void clear_list(list *S);
 __global__ void fill_list(const char *t, int k, int state_len,
 		heap **Q, list *S, state *states_pool, char *nodes_pool,
@@ -30,19 +22,16 @@ __global__ void fill_list(const char *t, int k, int state_len,
 __global__ void deduplicate(state **H, list *S);
 __global__ void push_to_queues(const char *t, int k, heap **Q, list *S, heur_fun h, int off);
 
+__device__ int f(const state *x, const char *t, heur_fun h);
+__device__ int calculate_id();
+__device__ state *state_create(const char *node, int f, int g, state *prev,
+		state *states_pool, char *nodes_pool, int state_len);
+
 char ***expand_bufs_create(int bufs, int elements, int element_size);
 char **expand_buf_create(int elements, int element_size);
 
 void states_pool_create(state **states, char **nodes, int node_size);
 void states_pool_destroy(state *states_pool, char *nodes_pool);
-__device__ state *state_create(const char *node, int f, int g, state *prev,
-		state *states_pool, char *nodes_pool, int state_len);
-
-__device__ void print_expanded(char **expanded) {
-	for (int i = 0; expanded[i] != NULL; i++) {
-		printf("%s\n", expanded[i]);
-	}
-}
 
 #define THREADS_PER_BLOCK 1024
 #define BLOCKS 16
@@ -52,7 +41,7 @@ __device__ int total_Q_size = 0;
 __device__ int found = 0;
 __device__ char result_path[RESULT_LEN];
 
-int astar_gpu(const char *s_in, const char *t_in, version_value version) {
+void astar_gpu(const char *s_in, const char *t_in, version_value version, void* version_data) {
 	char *s_gpu, *t_gpu;
 	int k = THREADS_PER_BLOCK * BLOCKS;
 	expand_fun expand_fun_cpu;
@@ -114,7 +103,6 @@ int astar_gpu(const char *s_in, const char *t_in, version_value version) {
 	heaps_destroy(Q, k);
 	HANDLE_RESULT(cudaFree(H));
 	HANDLE_RESULT(cudaDeviceSynchronize());
-	return 0;
 }
 
 
@@ -169,76 +157,8 @@ __global__ void fill_list(const char *t, int k, int state_len,
 	}
 }
 
-__global__ void push_to_queues(const char *t, int k, heap **Q, list *S, heur_fun h, int off) {
-	for (int i = threadIdx.x; i < S->length; i += blockDim.x) {
-		state *t1 = list_get(S, i);
-		if (t1 != NULL) {
-			t1->f = f(t1, t, h);
-			heap_insert(Q[(i + off) % k], t1);
-			atomicAdd(&processed, 1);
-			atomicAdd(&total_Q_size, 1);
-		}
-	}
-}
-
-__global__ void astar_kernel(const char *s, const char *t, int k, int state_len,
-		heap **Q, list **Ss, state **H, state *states_pool, char *nodes_pool,
-		char ***expand_buf, expand_fun expand, heur_fun h) {
-	state *m = NULL;
+__global__ void deduplicate(state **H, list *T) {
 	int id = calculate_id();
-	char **my_expand_buf = expand_buf[id];
-	list *S = Ss[blockIdx.x];
-
-	if (id == 0)steps++;
-
-	if (threadIdx.x == 0) {
-		list_clear(S);
-	}
-	__syncthreads();
-	for (int i = id; i < k; i += blockDim.x * gridDim.x) {
-		if (Q[i]->size == 0) continue;
-		state *q = heap_extract(Q[i]);
-		atomicSub(&total_Q_size, 1);
-		if (id == 0 && steps % 10 == 0) printf("step %d, processed %d, total distance %d\n", steps, processed, q->f);
-		if (steps % 10 == 0) return;;
-		if (cuda_str_eq(q->node, t)) {
-			if (m == NULL || f(q, t, h) < f(m, t, h)) {
-				m = q;
-			}
-			continue;
-		}
-		expand(q->node, my_expand_buf);
-		for (int j = 0; my_expand_buf[j][0] != '\0'; j++) {
-			list_insert(S, state_create(my_expand_buf[j], -1, q->g + 1, q, states_pool, nodes_pool, state_len));
-		}
-	}
-	if (m != NULL && f(m, t, h) < heaps_min(Q, k)) {
-		printf("In %d steps: Found path of length %d: [\n", steps, m->g);
-		found = 1;
-		return;
-	}
-	__syncthreads();
-	if (found) return;
-	hash_with_replacement_deduplicate(H, S, id);
-	__syncthreads();
-	int iter = 0;
-	for (int i = threadIdx.x; i < S->length; i += blockDim.x) {
-		state *t1 = list_get(S, i);
-		if (t1 != NULL) {
-			t1->f = f(t1, t, h);
-			heap_insert(Q[(id + iter) % k], t1);
-			atomicAdd(&processed, 1);
-			atomicAdd(&total_Q_size, 1);
-		}
-		iter++;
-	}
-}
-
-__global__ void deduplicate(state **H, list *S) {
-	hash_with_replacement_deduplicate(H, S, calculate_id());
-}
-
-__device__ void hash_with_replacement_deduplicate(state **H, list *T, int id) {
 	for (int i = id; i < T->length; i += blockDim.x * gridDim.x) {
 		int z = 0;
 		state *t = list_get(T, i);
@@ -267,6 +187,18 @@ __device__ void hash_with_replacement_deduplicate(state **H, list *T, int id) {
 					break;
 				}
 			}
+		}
+	}
+}
+
+__global__ void push_to_queues(const char *t, int k, heap **Q, list *S, heur_fun h, int off) {
+	for (int i = threadIdx.x; i < S->length; i += blockDim.x) {
+		state *t1 = list_get(S, i);
+		if (t1 != NULL) {
+			t1->f = f(t1, t, h);
+			heap_insert(Q[(i + off) % k], t1);
+			atomicAdd(&processed, 1);
+			atomicAdd(&total_Q_size, 1);
 		}
 	}
 }
@@ -323,7 +255,6 @@ __device__ state *state_create(const char *node, int f, int g, state *prev,
 	state *result = &(states_pool[index]);
 	memcpy(&(nodes_pool[state_len * index]), node, state_len);
 	result->node = &(nodes_pool[state_len * index]);
-	if (!*result->node) printf("NULL node\n");
 	result->f = f;
 	result->g = g;
 	result->prev = prev;

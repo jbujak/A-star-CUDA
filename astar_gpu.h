@@ -10,7 +10,7 @@ enum version_value {
 
 typedef void(*expand_fun)(const char *x, char **result);
 typedef int(*heur_fun)(const char *x, const char *t);
-int astar_gpu(const char *s, const char *t, version_value version);
+void astar_gpu(const char *s_in, const char *t_in, version_value version, void* version_data);
 
 struct state {
 	const char *node;

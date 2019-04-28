@@ -60,7 +60,7 @@ int main(int argc, const char *argv[]) {
 		std::string s, t;
 		std::getline(file, s);
 		std::getline(file, t);
-		astar_gpu(s.c_str(), t.c_str(), SLIDING);
+		astar_gpu(s.c_str(), t.c_str(), SLIDING, NULL);
 	} else if (config.version == PATHFINDING) {
 	}
 	return 0;
