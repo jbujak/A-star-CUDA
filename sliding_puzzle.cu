@@ -54,11 +54,16 @@ __device__ int h_sliding(const char *x, const char *t) {
 	return res;
 }
 
+__device__ int states_delta_sliding(const char *src, const char *dst) {
+	return 1;
+}
+
 __device__ expand_fun expand_sliding_gpu = expand_sliding;
 __device__ heur_fun h_sliding_gpu = h_sliding;
+__device__ states_delta_fun states_delta_sliding_gpu = states_delta_sliding;
 
 void sliding_puzzle_preprocessing(const char *s_in, const char *t_in, char **s_out, char **t_out,
-		expand_fun *expand_out, heur_fun *h_out,
+		expand_fun *expand_out, heur_fun *h_out, states_delta_fun *states_delta_out,
 		int *expand_elements_out, int *expand_element_size_out) {
 	char *s_gpu, *t_gpu;
 	int map_cpu[SLIDING_STATE_LEN + 1];
@@ -95,15 +100,17 @@ void sliding_puzzle_preprocessing(const char *s_in, const char *t_in, char **s_o
 	HANDLE_RESULT(cudaMemcpyToSymbol(sliding_map, map_cpu, (SLIDING_STATE_LEN + 1) * sizeof(int)));
 
 	expand_fun expand_fun_cpu;
-	HANDLE_RESULT(cudaMemcpyFromSymbol(&expand_fun_cpu, expand_sliding_gpu,
-				sizeof(expand_fun)));
 	heur_fun h_cpu;
+	states_delta_fun states_delta_cpu;
+	HANDLE_RESULT(cudaMemcpyFromSymbol(&expand_fun_cpu, expand_sliding_gpu, sizeof(expand_fun)));
 	HANDLE_RESULT(cudaMemcpyFromSymbol(&h_cpu, h_sliding_gpu, sizeof(heur_fun)));
+	HANDLE_RESULT(cudaMemcpyFromSymbol(&states_delta_cpu, states_delta_sliding_gpu, sizeof(states_delta_fun)));
 
 	*s_out = s_gpu;
 	*t_out = t_gpu;
 	*expand_out = expand_fun_cpu;
 	*h_out = h_cpu;
+	*states_delta_out = states_delta_cpu;
 	*expand_elements_out = 5;
 	*expand_element_size_out = SLIDING_EXPANDED_STATE_LEN + 1;
 }

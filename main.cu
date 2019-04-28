@@ -3,6 +3,8 @@
 #include <fstream>
 
 #include "astar_gpu.h"
+#include "sliding_puzzle.h"
+#include "pathfinding.h"
 
 struct config {
 	version_value version;
@@ -60,8 +62,11 @@ int main(int argc, const char *argv[]) {
 		std::string s, t;
 		std::getline(file, s);
 		std::getline(file, t);
-		astar_gpu(s.c_str(), t.c_str(), SLIDING, NULL);
+		astar_gpu(s.c_str(), t.c_str(), SLIDING);
 	} else if (config.version == PATHFINDING) {
+		std::string s, t;
+		pathfinding_read_input(file, s, t);
+		astar_gpu(s.c_str(), t.c_str(), PATHFINDING);
 	}
 	return 0;
 }

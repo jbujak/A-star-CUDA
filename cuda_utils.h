@@ -7,6 +7,10 @@ __device__ bool cuda_str_eq(const char *s1, const char *s2);
 
 __device__ int cuda_atoi(const char *str);
 
+__device__ int cuda_strlen(const char *str);
+
+__device__ int cuda_sprintf_int(char* str, int n);
+
 __device__ unsigned int jenkins_hash(int j, const char *str);
 
 #endif

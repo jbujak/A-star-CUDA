@@ -1,5 +1,5 @@
 FLAGS = -std=c++14 -g -G
-OBJS = astar_gpu.o heap.o list.o sliding_puzzle.o cuda_utils.o
+OBJS = astar_gpu.o heap.o list.o sliding_puzzle.o cuda_utils.o pathfinding.o
 ifeq ($(wildcard /opt/cuda/bin/nvcc),)
 	NVCC=nvcc
 else

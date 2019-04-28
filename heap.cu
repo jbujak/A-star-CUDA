@@ -92,7 +92,7 @@ __device__ bool heaps_empty(heap **heaps, int k) {
 __device__ int heaps_min(heap **heaps, int k) {
 	int best_f = INT_MAX;
 	for (int i = 0; i < k; i++) {
-		state *current_best = heaps[i]->states[0];
+		state *current_best = heaps[i]->states[1];
 		if (current_best != NULL && current_best->f < best_f) {
 			best_f = current_best->f;
 		}
