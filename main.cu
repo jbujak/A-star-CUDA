@@ -1,14 +1,11 @@
 #include <iostream>
 #include <string.h>
+#include <fstream>
 
 #include "astar_gpu.h"
 
-enum version_values {
-	SLIDING, PATHFINDING
-};
-
 struct config {
-	version_values version;
+	version_value version;
 	std::string input_file;
 	std::string output_file;
 };
@@ -52,20 +49,19 @@ int map_cpu[10];
 
 int main(int argc, const char *argv[]) {
 	config config;
-
-	const char *s_in = "2,1,3,5,_,4,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24";
-	const char *t_in = "2,1,3,5,9,4,6,7,8,14,10,11,12,13,19,15,16,17,18,24,20,21,22,23,_";
-	//const char *s_in = "6,1,16,5,10,3,2,7,9,4,21,8,23,15,20,11,_,17,12,14,22,19,18,13,24";
-	//const char *t_in = "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,_";
-
-	astar_gpu(s_in, t_in, 1024);
-
-	return 0;
 	try {
 		config = parse_args(argc, argv);
 	} catch (std::string error) {
 		std::cout << error << std::endl;
 		return 1;
+	}
+	std::ifstream file(config.input_file);
+	if (config.version == SLIDING) {
+		std::string s, t;
+		std::getline(file, s);
+		std::getline(file, t);
+		astar_gpu(s.c_str(), t.c_str(), SLIDING);
+	} else if (config.version == PATHFINDING) {
 	}
 	return 0;
 }

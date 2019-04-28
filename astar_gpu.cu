@@ -4,8 +4,13 @@
 #include "list.h"
 #include "sliding_puzzle.h"
 #include "cuda_utils.h"
+#include "assert.h"
+#include <vector>
+#include <string>
+#include <sstream>
+#include <algorithm>
 
-#define STATES (64 * 1024 * 1024)
+#define STATES (32 * 1024ll * 1024)
 #define HASH_SIZE  (1024 * 1024)
 #define HASH_FUNS 128
 
@@ -39,22 +44,17 @@ __device__ void print_expanded(char **expanded) {
 	}
 }
 
-//#define asdf
-
-#ifdef asdf
 #define THREADS_PER_BLOCK 1024
-#define BLOCKS 1
-#else
-#define THREADS_PER_BLOCK 256
-#define BLOCKS 64
-#endif
+#define BLOCKS 16
+#define RESULT_LEN (1024 * 1024)
 
 __device__ int total_Q_size = 0;
 __device__ int found = 0;
+__device__ char result_path[RESULT_LEN];
 
-int astar_gpu(const char *s_in, const char *t_in, int k) {
+int astar_gpu(const char *s_in, const char *t_in, version_value version) {
 	char *s_gpu, *t_gpu;
-	k = THREADS_PER_BLOCK * BLOCKS;
+	int k = THREADS_PER_BLOCK * BLOCKS;
 	expand_fun expand_fun_cpu;
 	heur_fun h_cpu;
 	int expand_elements;
@@ -68,7 +68,7 @@ int astar_gpu(const char *s_in, const char *t_in, int k) {
 	HANDLE_RESULT(cudaMalloc(&H, HASH_SIZE * sizeof(state*)));
 	HANDLE_RESULT(cudaMemset(H, 0, HASH_SIZE * sizeof(state*)));
 	heap **Q = heaps_create(k);
-	list **Ss = lists_create(BLOCKS, 100000);
+	list **Ss = lists_create(BLOCKS, 1000000);
 	list *S = list_create(1024 * 1024);
 	state *states_pool;
 	char *nodes_pool;
@@ -93,6 +93,21 @@ int astar_gpu(const char *s_in, const char *t_in, int k) {
 		HANDLE_RESULT(cudaMemcpyFromSymbol(&total_Q_size_cpu, total_Q_size, sizeof(int)));
 		step++;
 	} while (total_Q_size_cpu > 0);
+
+
+	char result_path_cpu[RESULT_LEN];
+	HANDLE_RESULT(cudaMemcpyFromSymbol(result_path_cpu, result_path, RESULT_LEN));
+
+	std::string path_str = std::string(result_path_cpu);
+	std::istringstream path_stream;
+	path_stream.str(result_path_cpu);
+
+	std::vector<std::string> v;
+	for (std::string line; std::getline(path_stream, line); ) {
+		v.push_back(line);
+	}
+	std::reverse(v.begin(), v.end());
+	printf("%s", sliding_puzzle_postprocessing(v).c_str());
 
 	states_pool_destroy(states_pool, nodes_pool);
 	lists_destroy(Ss, BLOCKS);
@@ -128,7 +143,6 @@ __global__ void fill_list(const char *t, int k, int state_len,
 		atomicSub(&total_Q_size, 1);
 		if (id == 0 && steps % 10 == 0) printf("step %d, processed %d, total distance %d\n", steps, processed, q->f);
 		if (cuda_str_eq(q->node, t)) {
-			printf("found %s\n", q->node);
 			if (m == NULL || f(q, t, h) < f(m, t, h)) {
 				m = q;
 			}
@@ -142,6 +156,15 @@ __global__ void fill_list(const char *t, int k, int state_len,
 	if (m != NULL && f(m, t, h) < heaps_min(Q, k)) {
 		printf("In %d steps: Found path of length %d: [\n", steps, m->g);
 		found = 1;
+		state *cur = m;
+		int result_len = 0;
+		while (cur != NULL) {
+			memcpy(result_path + result_len, cur->node, state_len);
+			result_len += state_len;
+			result_path[result_len-1] = '\n';
+			cur = cur->prev;
+		}
+		result_path[result_len-1] = '\0';
 		return;
 	}
 }
@@ -222,8 +245,6 @@ __device__ void hash_with_replacement_deduplicate(state **H, list *T, int id) {
 		for (int j = 0; j < HASH_FUNS; j++) {
 			assert(t->node != NULL);
 			state *el = H[jenkins_hash(j, t->node) % HASH_SIZE];
-			if (el != NULL && !*(t->node)) printf("%d NULL\n", __LINE__);
-			if (el != NULL && !*(el->node)) printf("%d NULL\n", __LINE__);
 			if (el == NULL || cuda_str_eq(t->node, el->node)) {
 				z = j;
 				break;
@@ -231,8 +252,6 @@ __device__ void hash_with_replacement_deduplicate(state **H, list *T, int id) {
 		}
 		int index = jenkins_hash(z, t->node) % HASH_SIZE;
 		t = (state*)atomicExch((unsigned long long*)&(H[index]), (unsigned long long)t);
-		if (t != NULL && !*(t->node)) printf("%d NULL\n", __LINE__);
-		if (t != NULL && !*(list_get(T, i)->node)) printf("%d NULL\n", __LINE__);
 		if (t != NULL && cuda_str_eq(t->node, list_get(T, i)->node)) {
 			list_remove(T, i);
 			continue;
@@ -258,9 +277,9 @@ __device__ int f(const state *x, const char *t, heur_fun h) {
 
 void states_pool_create(state **states, char **nodes, int node_size) {
 	HANDLE_RESULT(cudaMalloc(states, STATES * sizeof(state)));
-	HANDLE_RESULT(cudaMalloc(nodes, STATES * node_size * sizeof(char)));
+	HANDLE_RESULT(cudaMalloc(nodes, 3 * STATES * node_size * sizeof(char)));
 	HANDLE_RESULT(cudaMemset(*states, 0, STATES * sizeof(state)));
-	HANDLE_RESULT(cudaMemset(*nodes, 0, STATES * node_size * sizeof(char)));
+	HANDLE_RESULT(cudaMemset(*nodes, 0, 3 * STATES * node_size * sizeof(char)));
 }
 
 void states_pool_destroy(state *states_pool, char *nodes_pool) {

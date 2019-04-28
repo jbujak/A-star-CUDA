@@ -107,3 +107,16 @@ void sliding_puzzle_preprocessing(const char *s_in, const char *t_in, char **s_o
 	*expand_elements_out = 5;
 	*expand_element_size_out = SLIDING_EXPANDED_STATE_LEN + 1;
 }
+
+std::string sliding_puzzle_postprocessing(std::vector<std::string> in) {
+	std::string result;
+	for (std::string line: in) {
+		for (int i = 0; i < line.length(); i += 3) {
+			if (line[i] != '0' && line[i] != '_') result += line[i];
+			result += line[i + 1];
+			result += ",";
+		}
+		result[result.length() - 1] = '\n';
+	}
+	return result;
+}
