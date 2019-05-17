@@ -111,19 +111,6 @@ void pathfinding_preprocessing(const char *s_in, const char *t_in, char **s_out,
 		int *expand_elements_out, int *expand_element_size_out) {
 	char *s_gpu, *t_gpu;
 
-	//printf("   ");
-	//for (int i = 0; i < 100; i++) {
-	//	printf("%02d ", i);
-	//}
-	//printf("\n");
-	//for (int i = 0; i < 100; i++) {
-	//	for (int j = 0; j < 100; j++) {
-	//		if (j == 0) printf("%02d ", i);
-	//		if (board_cpu[i][j] == -1) printf("XX ");
-	//		else printf("   ");
-	//	}
-	//	printf("\n");
-	//}
 
 	HANDLE_RESULT(cudaMalloc(&s_gpu, PATHFINDING_STATE_LEN + 1));
 	HANDLE_RESULT(cudaMalloc(&t_gpu, PATHFINDING_STATE_LEN + 1));
